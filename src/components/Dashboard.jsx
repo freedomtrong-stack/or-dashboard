@@ -294,20 +294,28 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
-          <div>
+          <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold tracking-wide">CMU OR Status</h1>
-            <p className="text-gray-400 text-xs mt-0.5">Real-time Operating Room Cases</p>
+            <span className="flex items-center gap-1.5 text-green-400 text-sm font-medium">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              ON
+            </span>
           </div>
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             {lastUpdated && (
               <span className="text-gray-400 text-xs">
                 Updated: {lastUpdated.toLocaleTimeString()}
               </span>
             )}
-            <span className="flex items-center gap-1.5 text-green-400 text-sm font-medium">
-              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              ON
-            </span>
+            <a
+              href="tel:053935777"
+              className="flex items-center gap-1.5 bg-green-700 hover:bg-green-600 active:bg-green-800 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              Call Stretcher
+            </a>
             <Link
               to="/reserve"
               className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
