@@ -4,16 +4,16 @@ import { supabase } from '../supabaseClient'
 
 const CONDITION_ROW = {
   Immediate:    'bg-red-950/60 hover:bg-red-950/80',
-  Emergency:    'bg-orange-950/60 hover:bg-orange-950/80',
+  Critical:    'bg-orange-950/60 hover:bg-orange-950/80',
   Urgency:      'bg-yellow-950/50 hover:bg-yellow-950/70',
-  'Non-urgency':'bg-blue-950/40 hover:bg-blue-950/60',
+  'Expedited':'bg-blue-950/40 hover:bg-blue-950/60',
 }
 
 const CONDITION_BADGE = {
   Immediate:    'bg-red-600 text-white',
-  Emergency:    'bg-orange-500 text-white',
+  Critical:    'bg-orange-500 text-white',
   Urgency:      'bg-yellow-400 text-gray-900',
-  'Non-urgency':'bg-blue-500 text-white',
+  'Expedited':'bg-blue-500 text-white',
 }
 
 const STATUS_BADGE = {
@@ -25,7 +25,7 @@ const STATUS_BADGE = {
   Cancelled:    'bg-red-900 text-red-300',
 }
 
-const CONDITION_ORDER = { Immediate: 0, Emergency: 1, Urgency: 2, 'Non-urgency': 3 }
+const CONDITION_ORDER = { Immediate: 0, Critical: 1, Urgency: 2, 'Expedited': 3 }
 
 const NEXT_STATUSES = {
   Reserve:      ['Waiting', 'Cancelled'],
@@ -180,7 +180,7 @@ export default function Dashboard() {
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-wide">OR Status Dashboard</h1>
+            <h1 className="text-2xl font-bold tracking-wide">CMU OR Status</h1>
             <p className="text-gray-400 text-sm mt-0.5">Real-time Operating Room Cases</p>
           </div>
           <div className="flex items-center gap-4 flex-wrap">
@@ -191,7 +191,7 @@ export default function Dashboard() {
             )}
             <span className="flex items-center gap-1.5 text-green-400 text-sm font-medium">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              Live
+              ON
             </span>
             <Link
               to="/reserve"
@@ -332,7 +332,7 @@ export default function Dashboard() {
                       key={c.id}
                       className={`rounded-xl border-l-4 px-4 py-3.5 ${
                         c.condition === 'Immediate'    ? 'border-red-500 bg-red-950/60' :
-                        c.condition === 'Emergency'    ? 'border-orange-500 bg-orange-950/60' :
+                        c.condition === 'Critical'    ? 'border-orange-500 bg-orange-950/60' :
                         c.condition === 'Urgency'      ? 'border-yellow-400 bg-yellow-950/50' :
                         'border-blue-500 bg-blue-950/40'
                       }`}
@@ -369,6 +369,7 @@ export default function Dashboard() {
                         <th className="px-4 py-3 text-left">Operation</th>
                         <th className="px-4 py-3 text-left">Condition</th>
                         <th className="px-4 py-3 text-left">Status</th>
+                        <th className="px-4 py-3 text-left">Note</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -395,6 +396,7 @@ export default function Dashboard() {
                           <td className="px-4 py-3.5">
                             <StatusDropdown caseId={c.id} currentStatus={c.status} onUpdate={quickStatus} />
                           </td>
+                          <td className="px-4 py-3.5 text-gray-400 text-sm">{c.note ?? '—'}</td>
                         </tr>
                       ))}
                     </tbody>

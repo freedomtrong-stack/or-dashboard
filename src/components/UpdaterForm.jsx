@@ -2,16 +2,16 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 
-const CONDITIONS = ['Immediate', 'Emergency', 'Urgency', 'Non-urgency']
+const CONDITIONS = ['Immediate', 'Critical', 'Urgency', 'Expedited']
 const STATUSES = ['Reserve', 'Waiting', 'On case', 'เลื่อน NPO', 'Done']
 
 const CANCEL_STATUS = 'Cancelled'
 
 const CONDITION_SELECTED = {
   Immediate:    'border-red-500 bg-red-50 text-red-700',
-  Emergency:    'border-orange-500 bg-orange-50 text-orange-700',
+  Critical:    'border-orange-500 bg-orange-50 text-orange-700',
   Urgency:      'border-yellow-400 bg-yellow-50 text-yellow-700',
-  'Non-urgency':'border-blue-500 bg-blue-50 text-blue-700',
+  'Expedited':'border-blue-500 bg-blue-50 text-blue-700',
 }
 
 const STATUS_SELECTED = {
@@ -154,7 +154,7 @@ export default function UpdaterForm() {
             <h1 className="text-lg font-bold text-gray-900 leading-tight">
               {isEditing ? 'Edit Case' : 'New Case'}
             </h1>
-            <p className="text-xs text-gray-400">OR Emergency Form</p>
+            <p className="text-xs text-gray-400">OR Critical Form</p>
           </div>
         </div>
       </header>
