@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 
 const CONDITIONS = ['Immediate', 'Critical', 'Urgency', 'Expedited']
-const STATUSES = ['Reserve', 'Waiting', 'On case', 'เลื่อน NPO', 'Done']
+const STATUSES = ['Reserve', 'Waiting', 'Next', 'On case', 'เลื่อน NPO', 'Done']
 
 const CANCEL_STATUS = 'Cancelled'
 
@@ -17,6 +17,7 @@ const CONDITION_SELECTED = {
 const STATUS_SELECTED = {
   Reserve:      'border-purple-500 bg-purple-50 text-purple-700',
   Waiting:      'border-gray-500 bg-gray-100 text-gray-800',
+  Next:         'border-yellow-400 bg-yellow-50 text-yellow-700',
   'On case':    'border-blue-500 bg-blue-50 text-blue-700',
   'เลื่อน NPO': 'border-gray-400 bg-gray-100 text-gray-700',
   Done:         'border-green-500 bg-green-50 text-green-700',
@@ -161,34 +162,6 @@ export default function UpdaterForm() {
 
       <form onSubmit={handleSubmit} className="px-4 py-6 max-w-lg mx-auto space-y-6">
 
-        {/* Status first — Reserve is default */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Status <span className="text-red-500">*</span>
-          </label>
-          <div className="grid grid-cols-2 gap-2.5">
-            {STATUSES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => set('status')(s)}
-                className={`py-4 rounded-xl text-sm font-bold border-2 transition-all active:scale-95 ${
-                  form.status === s
-                    ? `${STATUS_SELECTED[s]} shadow-md scale-[1.01]`
-                    : IDLE
-                }`}
-              >
-                {s === 'Reserve' ? '⚡ Reserve' : s}
-              </button>
-            ))}
-          </div>
-          {form.status === 'เลื่อน NPO' && (
-            <p className="text-amber-600 text-xs mt-2">
-              Case remains active — change back to Waiting when NPO time is ready.
-            </p>
-          )}
-        </div>
-
         {/* Condition */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -242,13 +215,17 @@ export default function UpdaterForm() {
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
             HN (Hospital Number)
-            {isReserve && <span className="ml-2 text-gray-400 text-xs font-normal">Optional for Reserve</span>}
+            {isReserve
+              ? <span className="ml-2 text-gray-400 text-xs font-normal">Optional for Reserve</span>
+              : <span className="text-red-500"> *</span>
+            }
           </label>
           <input
             type="text"
             value={form.hn}
             onChange={(e) => set('hn')(e.target.value)}
-            placeholder={isReserve ? 'Unknown / leave blank' : 'e.g. 123456'}
+            required={!isReserve}
+            placeholder={isReserve ? 'Unknown / leave blank' : 'e.g. 3979502'}
             className="w-full px-4 py-4 text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 bg-white transition-colors"
           />
         </div>
@@ -281,6 +258,34 @@ export default function UpdaterForm() {
             placeholder="e.g. Craniotomy"
             className="w-full px-4 py-4 text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 bg-white transition-colors"
           />
+        </div>
+
+        {/* Status */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Status <span className="text-red-500">*</span>
+          </label>
+          <div className="grid grid-cols-2 gap-2.5">
+            {STATUSES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => set('status')(s)}
+                className={`py-4 rounded-xl text-sm font-bold border-2 transition-all active:scale-95 ${
+                  form.status === s
+                    ? `${STATUS_SELECTED[s]} shadow-md scale-[1.01]`
+                    : IDLE
+                }`}
+              >
+                {s === 'Reserve' ? '⚡ Reserve' : s}
+              </button>
+            ))}
+          </div>
+          {form.status === 'เลื่อน NPO' && (
+            <p className="text-gray-500 text-xs mt-2">
+              Case remains active — change back to Waiting when NPO time is ready.
+            </p>
+          )}
         </div>
 
         {/* Error */}

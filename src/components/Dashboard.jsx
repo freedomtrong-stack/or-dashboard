@@ -19,6 +19,7 @@ const CONDITION_BADGE = {
 const STATUS_BADGE = {
   Reserve:      'bg-purple-600 text-white',
   Waiting:      'bg-gray-600 text-gray-100',
+  Next:         'bg-yellow-400 text-gray-900',
   'On case':    'bg-green-500 text-white',
   'เลื่อน NPO': 'bg-gray-500 text-white',
   Done:         'bg-gray-500 text-white',
@@ -26,25 +27,106 @@ const STATUS_BADGE = {
 }
 
 const CONDITION_ORDER = { Immediate: 0, Critical: 1, Urgency: 2, 'Expedited': 3 }
+const STATUS_ORDER = { 'On case': 0, Next: 1, Waiting: 2 }
 
 const NEXT_STATUSES = {
   Reserve:      ['Waiting', 'Cancelled'],
-  Waiting:      ['On case', 'เลื่อน NPO', 'Cancelled'],
+  Waiting:      ['Next', 'On case', 'เลื่อน NPO', 'Cancelled'],
+  Next:         ['On case', 'Waiting', 'Cancelled'],
   'On case':    ['Done', 'Cancelled'],
   'เลื่อน NPO': ['Waiting', 'Cancelled'],
 }
 
 const DROPDOWN_BTN = {
   Waiting:      'hover:bg-gray-700 text-gray-200',
+  Next:         'hover:bg-yellow-900 text-yellow-300',
   'On case':    'hover:bg-green-900 text-green-300',
   'เลื่อน NPO': 'hover:bg-gray-700 text-gray-300',
   Done:         'hover:bg-blue-900 text-blue-300',
   Cancelled:    'hover:bg-red-900 text-red-400',
 }
 
+const CORRECT_PIN = import.meta.env.VITE_UPDATER_PIN ?? '1234'
+const SESSION_KEY = 'or_pin_unlocked'
+
+function PinModal({ onSuccess, onClose }) {
+  const [pin, setPin] = useState('')
+  const [error, setError] = useState(false)
+  const [shake, setShake] = useState(false)
+
+  function handleDigit(d) {
+    if (pin.length >= 4) return
+    const next = pin + d
+    setPin(next)
+    setError(false)
+    if (next.length === 4) {
+      if (next === CORRECT_PIN) {
+        sessionStorage.setItem(SESSION_KEY, 'true')
+        onSuccess()
+      } else {
+        setError(true)
+        setShake(true)
+        setTimeout(() => { setPin(''); setShake(false) }, 600)
+      }
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={onClose}>
+      <div className="bg-gray-900 rounded-2xl p-6 w-72 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-white font-bold text-sm">Enter PIN to continue</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-white text-xs">✕</button>
+        </div>
+        <div className={`flex justify-center gap-3 mb-5 ${shake ? 'animate-bounce' : ''}`}>
+          {[0,1,2,3].map((i) => (
+            <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${
+              pin.length > i
+                ? error ? 'bg-red-500 border-red-500' : 'bg-blue-400 border-blue-400'
+                : 'bg-transparent border-gray-600'
+            }`} />
+          ))}
+        </div>
+        {error && <p className="text-red-400 text-xs text-center mb-3">Incorrect PIN</p>}
+        <div className="grid grid-cols-3 gap-2">
+          {[1,2,3,4,5,6,7,8,9].map((d) => (
+            <button key={d} onClick={() => handleDigit(String(d))}
+              className="h-12 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 text-white font-semibold rounded-xl transition-colors">
+              {d}
+            </button>
+          ))}
+          <button onClick={() => setPin(p => p.slice(0,-1))}
+            className="h-12 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-xl transition-colors flex items-center justify-center">
+            ⌫
+          </button>
+          <button onClick={() => handleDigit('0')}
+            className="h-12 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 text-white font-semibold rounded-xl transition-colors">
+            0
+          </button>
+          <button onClick={() => setPin('')}
+            className="h-12 bg-gray-800 hover:bg-gray-700 text-gray-500 text-xs rounded-xl transition-colors">
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function StatusDropdown({ caseId, currentStatus, onUpdate }) {
   const [open, setOpen] = useState(false)
+  const [showPin, setShowPin] = useState(false)
   const nexts = NEXT_STATUSES[currentStatus] ?? []
+
+  function handleBadgeClick(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (sessionStorage.getItem(SESSION_KEY) === 'true') {
+      setOpen((o) => !o)
+    } else {
+      setShowPin(true)
+    }
+  }
 
   if (nexts.length === 0) {
     return (
@@ -55,40 +137,54 @@ function StatusDropdown({ caseId, currentStatus, onUpdate }) {
   }
 
   return (
-    <div className="relative inline-block">
-      <button
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((o) => !o) }}
-        className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_BADGE[currentStatus] ?? 'bg-gray-600 text-white'} flex items-center gap-1`}
-      >
-        {currentStatus}
-        <svg className="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && (
-        <>
-          {/* backdrop to close */}
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-8 z-20 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden min-w-[140px]">
-            {nexts.map((s) => (
-              <button
-                key={s}
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  onUpdate(caseId, s)
-                  setOpen(false)
-                }}
-                className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${DROPDOWN_BTN[s] ?? 'hover:bg-gray-700 text-white'}`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </>
+    <>
+      {showPin && (
+        <PinModal
+          onSuccess={() => { setShowPin(false); setOpen(true) }}
+          onClose={() => setShowPin(false)}
+        />
       )}
-    </div>
+      <div className="relative inline-block">
+        <button
+          onClick={handleBadgeClick}
+          className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_BADGE[currentStatus] ?? 'bg-gray-600 text-white'} flex items-center gap-1`}
+        >
+          {currentStatus}
+          <svg className="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+            <div className="absolute left-0 top-8 z-20 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden min-w-[140px]">
+              {nexts.map((s) => (
+                <button
+                  key={s}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onUpdate(caseId, s)
+                    setOpen(false)
+                  }}
+                  className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${DROPDOWN_BTN[s] ?? 'hover:bg-gray-700 text-white'}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </>
   )
+}
+
+function maskHN(hn) {
+  if (!hn) return '—'
+  if (sessionStorage.getItem(SESSION_KEY) === 'true') return hn
+  if (hn.length <= 2) return '**'
+  return hn.slice(0, -2) + '**'
 }
 
 function fmt(ts) {
@@ -119,6 +215,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [error, setError] = useState(null)
+  const [now, setNow] = useState(new Date())
+
+  useEffect(() => {
+    const tick = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(tick)
+  }, [])
 
   useEffect(() => {
     fetchActive()
@@ -172,16 +274,29 @@ export default function Dashboard() {
   const sorted = active
     .filter((c) => c.status !== 'Reserve' && c.status !== 'เลื่อน NPO')
     .filter((c) => !filter || c.condition === filter)
-    .sort((a, b) => (CONDITION_ORDER[a.condition] ?? 9) - (CONDITION_ORDER[b.condition] ?? 9))
+    .sort((a, b) => {
+      const statusDiff = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)
+      if (statusDiff !== 0) return statusDiff
+      return (CONDITION_ORDER[a.condition] ?? 9) - (CONDITION_ORDER[b.condition] ?? 9)
+    })
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+      <header className="bg-gray-800 border-b border-gray-700 px-4 py-3">
+        {/* Clock — desktop only */}
+        <div className="hidden md:block text-center mb-2">
+          <p className="text-4xl font-bold font-mono tracking-widest text-white">
+            {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </p>
+          <p className="text-gray-400 text-xs mt-0.5">
+            {now.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
+        </div>
         <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-wide">CMU OR Status</h1>
-            <p className="text-gray-400 text-sm mt-0.5">Real-time Operating Room Cases</p>
+            <h1 className="text-lg font-bold tracking-wide">CMU OR Status</h1>
+            <p className="text-gray-400 text-xs mt-0.5">Real-time Operating Room Cases</p>
           </div>
           <div className="flex items-center gap-4 flex-wrap">
             {lastUpdated && (
@@ -294,7 +409,7 @@ export default function Dashboard() {
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${CONDITION_BADGE[c.condition] ?? 'bg-gray-600 text-white'}`}>
                       {c.condition}
                     </span>
-                    {c.hn && <span className="text-blue-400 font-mono text-xs">{c.hn}</span>}
+                    {maskHN(c.hn) !== '—' && <span className="text-blue-400 font-mono text-xs">{maskHN(c.hn)}</span>}
                     <StatusDropdown caseId={c.id} currentStatus={c.status} onUpdate={quickStatus} />
                   </div>
                   <p className="text-white font-semibold">{c.dx ?? <span className="text-gray-500 italic">TBD</span>}</p>
@@ -341,7 +456,7 @@ export default function Dashboard() {
                         <div className="flex items-center gap-2">
                           <span className="text-gray-500 text-xs font-mono">{i + 1}</span>
                           <Link to={`/update/${c.id}`} className="text-blue-400 font-mono font-semibold text-sm underline underline-offset-2">
-                            {c.hn ?? '—'}
+                            {maskHN(c.hn)}
                           </Link>
                         </div>
                         <div className="flex items-center gap-2">
@@ -383,7 +498,7 @@ export default function Dashboard() {
                           <td className="px-4 py-3.5 text-gray-400 font-mono text-xs">{i + 1}</td>
                           <td className="px-4 py-3.5">
                             <Link to={`/update/${c.id}`} className="font-mono text-blue-400 hover:text-blue-300 underline underline-offset-2 text-sm">
-                              {c.hn ?? '—'}
+                              {maskHN(c.hn)}
                             </Link>
                           </td>
                           <td className="px-4 py-3.5 font-semibold text-white">{c.dx ?? <span className="text-gray-500 italic">TBD</span>}</td>
@@ -428,7 +543,7 @@ export default function Dashboard() {
                           <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${CONDITION_BADGE[c.condition] ?? 'bg-gray-600 text-white'}`}>
                             {c.condition}
                           </span>
-                          {c.hn && <span className="text-blue-400 font-mono text-xs">{c.hn}</span>}
+                          {maskHN(c.hn) !== '—' && <span className="text-blue-400 font-mono text-xs">{maskHN(c.hn)}</span>}
                           <StatusDropdown caseId={c.id} currentStatus={c.status} onUpdate={quickStatus} />
                         </div>
                         <p className="text-gray-300 font-semibold">{c.dx ?? <span className="italic text-gray-500">TBD</span>}</p>
@@ -449,7 +564,7 @@ export default function Dashboard() {
                           <td className="px-4 py-3 text-gray-500 font-mono text-xs">{i + 1}</td>
                           <td className="px-4 py-3">
                             <Link to={`/update/${c.id}`} className="font-mono text-blue-400 hover:text-blue-300 underline underline-offset-2 text-sm">
-                              {c.hn ?? '—'}
+                              {maskHN(c.hn)}
                             </Link>
                           </td>
                           <td className="px-4 py-3 text-gray-300 font-semibold">{c.dx ?? <span className="italic text-gray-500">TBD</span>}</td>
@@ -505,7 +620,7 @@ export default function Dashboard() {
                             : CONDITION_ROW[c.condition] ?? 'bg-gray-800'
                         }`}
                       >
-                        <td className="px-4 py-3.5 font-mono text-blue-300 text-xs">{c.hn ?? '—'}</td>
+                        <td className="px-4 py-3.5 font-mono text-blue-300 text-xs">{maskHN(c.hn)}</td>
                         <td className="px-4 py-3.5 font-semibold text-white">{c.dx}</td>
                         <td className="px-4 py-3.5 text-gray-300">{c.operation}</td>
                         <td className="px-4 py-3.5">
