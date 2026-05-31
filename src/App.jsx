@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import Dashboard from './components/Dashboard'
 import UpdaterForm from './components/UpdaterForm'
 import ReserveForm from './components/ReserveForm'
@@ -23,6 +24,7 @@ export default function App() {
           element={<PinGate><ReserveForm /></PinGate>}
         />
       </Routes>
+      <Analytics />
     </BrowserRouter>
   )
 }
