@@ -35,6 +35,8 @@ const NEXT_STATUSES = {
   Next:         ['On case', 'Waiting', 'Cancelled'],
   'On case':    ['Done', 'Cancelled'],
   'เลื่อน NPO': ['Waiting', 'Cancelled'],
+  Done:         ['On case', 'Waiting'],
+  Cancelled:    ['Waiting'],
 }
 
 const DROPDOWN_BTN = {
@@ -44,6 +46,7 @@ const DROPDOWN_BTN = {
   'เลื่อน NPO': 'hover:bg-gray-700 text-gray-300',
   Done:         'hover:bg-blue-900 text-blue-300',
   Cancelled:    'hover:bg-red-900 text-red-400',
+  Waiting:      'hover:bg-gray-700 text-gray-200',
 }
 
 const CORRECT_PIN = import.meta.env.VITE_UPDATER_PIN ?? '1234'
@@ -212,6 +215,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState([])
   const [tab, setTab] = useState('active')
   const [filter, setFilter] = useState(null)
+  const [historyFilter, setHistoryFilter] = useState(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [error, setError] = useState(null)
@@ -304,23 +308,23 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
             <h1 className="text-lg font-bold tracking-wide">CMU OR Status</h1>
             <span className="flex items-center gap-1.5 text-green-400 text-sm font-medium">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
               ON
             </span>
+            {lastUpdated && (
+              <div className="ml-auto text-right">
+                <p className="text-gray-500 text-xs">Last updated</p>
+                <p className="text-white text-sm font-semibold">
+                  {lastUpdated.toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                  {' '}
+                  {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            )}
           </div>
-          {lastUpdated && (
-            <div className="w-full md:w-auto text-center md:text-left">
-              <p className="text-gray-500 text-xs">Last updated</p>
-              <p className="text-white text-sm font-semibold">
-                {lastUpdated.toLocaleDateString([], { day: 'numeric', month: 'short' })}
-                {' '}
-                {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
-            </div>
-          )}
           <div className="flex items-center gap-3 flex-wrap">
             <a
               href="tel:053935777"
@@ -613,9 +617,31 @@ export default function Dashboard() {
         {/* HISTORY TAB */}
         {tab === 'history' && (
           <>
-            {history.length === 0 ? (
+            {/* History filter */}
+            <div className="flex items-center gap-2 flex-wrap mb-4">
+              {['All', 'Done', 'Cancelled', 'On case', 'Waiting'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setHistoryFilter(f === 'All' ? null : f)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    (f === 'All' && !historyFilter) || historyFilter === f
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {f}
+                  <span className="ml-1.5 text-xs opacity-70">
+                    {f === 'All'
+                      ? history.length
+                      : history.filter(c => c.status === f).length}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {history.filter(c => !historyFilter || c.status === historyFilter).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                <p className="text-lg font-medium">No cases in last 48 hours</p>
+                <p className="text-lg font-medium">No cases found</p>
               </div>
             ) : (
               <div className="overflow-x-auto rounded-xl shadow-xl">
@@ -634,7 +660,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {history.map((c) => (
+                    {history.filter(c => !historyFilter || c.status === historyFilter).map((c) => (
                       <tr
                         key={c.id}
                         className={`border-b border-gray-700/50 transition-colors ${
@@ -652,9 +678,7 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_BADGE[c.status] ?? 'bg-gray-600 text-white'}`}>
-                            {c.status}
-                          </span>
+                          <StatusDropdown caseId={c.id} currentStatus={c.status} onUpdate={quickStatus} />
                         </td>
                         <td className="px-4 py-3.5 text-gray-400 text-xs whitespace-nowrap">{fmtDate(c.created_at)}</td>
                         <td className="px-4 py-3.5 text-green-400 text-xs whitespace-nowrap">{fmtDate(c.on_case_at)}</td>
