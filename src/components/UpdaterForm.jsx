@@ -4,6 +4,8 @@ import { supabase } from '../supabaseClient'
 
 const CONDITIONS = ['Immediate', 'Critical', 'Urgency', 'Expedited']
 const STATUSES = ['Reserve', 'Waiting', 'Next', 'On case', 'เลื่อน NPO', 'Done']
+const DEPARTMENTS = ['Surgery', 'Orthopedic', 'Eye', 'ENT', 'OBGYN', 'Med']
+const SURGERY_SUBTYPES = ['UGI', 'Colo', 'HPB', 'BE', 'Vas', 'Ped', 'CVT', 'Neuro', 'Plastic', 'Trauma', 'Uro', 'Transplant']
 
 const CANCEL_STATUS = 'Cancelled'
 
@@ -37,6 +39,8 @@ export default function UpdaterForm() {
     note: '',
     condition: 'Immediate',
     status: 'Reserve',
+    department: null,
+    subtype: null,
   })
   const [fetching, setFetching] = useState(isEditing)
   const [loading, setLoading] = useState(false)
@@ -64,6 +68,8 @@ export default function UpdaterForm() {
           note: data.note ?? '',
           condition: data.condition,
           status: data.status,
+          department: data.department ?? null,
+          subtype: data.subtype ?? null,
         })
       }
       setFetching(false)
@@ -87,6 +93,8 @@ export default function UpdaterForm() {
       note: form.note.trim() || null,
       condition: form.condition,
       status: form.status,
+      department: form.department,
+      subtype: form.department === 'Surgery' ? form.subtype : null,
     }
 
     const { error } = isEditing
@@ -258,6 +266,55 @@ export default function UpdaterForm() {
             placeholder="e.g. Craniotomy"
             className="w-full px-4 py-4 text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 bg-white transition-colors"
           />
+        </div>
+
+        {/* Department */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Department
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {DEPARTMENTS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => {
+                  set('department')(form.department === d ? null : d)
+                  set('subtype')(null)
+                }}
+                className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all active:scale-95 ${
+                  form.department === d
+                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-md scale-[1.01]'
+                    : 'border-gray-200 bg-white text-gray-400'
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+
+          {/* Surgery subtypes */}
+          {form.department === 'Surgery' && (
+            <div className="mt-3">
+              <p className="text-xs text-indigo-500 font-semibold mb-2">Surgery subtype</p>
+              <div className="grid grid-cols-4 gap-2">
+                {SURGERY_SUBTYPES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => set('subtype')(form.subtype === s ? null : s)}
+                    className={`py-2.5 rounded-xl text-xs font-semibold border-2 transition-all active:scale-95 ${
+                      form.subtype === s
+                        ? 'border-indigo-400 bg-indigo-50 text-indigo-700 shadow-md'
+                        : 'border-gray-200 bg-white text-gray-400'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Status */}
