@@ -249,9 +249,19 @@ export default function Dashboard() {
       .not('status', 'in', '("Done","Cancelled")')
       .order('created_at', { ascending: true })
 
-
     if (error) setError('Failed to load cases.')
-    else { setActive(data); setError(null) }
+    else {
+      setActive(data)
+      setError(null)
+      // find most recent update across all active cases
+      if (data.length > 0) {
+        const latest = data.reduce((max, c) => {
+          const t = new Date(c.updated_at ?? c.created_at)
+          return t > max ? t : max
+        }, new Date(0))
+        setLastUpdated(latest)
+      }
+    }
     setLoading(false)
   }
 
@@ -301,12 +311,17 @@ export default function Dashboard() {
               ON
             </span>
           </div>
+          {lastUpdated && (
+            <div className="w-full md:w-auto text-center md:text-left">
+              <p className="text-gray-500 text-xs">Last updated</p>
+              <p className="text-white text-sm font-semibold">
+                {lastUpdated.toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                {' '}
+                {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          )}
           <div className="flex items-center gap-3 flex-wrap">
-            {lastUpdated && (
-              <span className="text-gray-400 text-xs">
-                Updated: {lastUpdated.toLocaleTimeString()}
-              </span>
-            )}
             <a
               href="tel:053935777"
               className="flex items-center gap-1.5 bg-green-700 hover:bg-green-600 active:bg-green-800 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors"
