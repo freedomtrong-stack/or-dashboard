@@ -46,7 +46,6 @@ const DROPDOWN_BTN = {
   'เลื่อน NPO': 'hover:bg-gray-700 text-gray-300',
   Done:         'hover:bg-blue-900 text-blue-300',
   Cancelled:    'hover:bg-red-900 text-red-400',
-  Waiting:      'hover:bg-gray-700 text-gray-200',
 }
 
 const CORRECT_PIN = import.meta.env.VITE_UPDATER_PIN ?? '1234'

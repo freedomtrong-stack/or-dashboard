@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Dashboard from './components/Dashboard'
 import UpdaterForm from './components/UpdaterForm'
 import ReserveForm from './components/ReserveForm'
+import KpiDashboard from './components/KpiDashboard'
 import PinGate from './components/PinGate'
 
 export default function App() {
@@ -21,6 +22,10 @@ export default function App() {
         <Route
           path="/reserve"
           element={<PinGate><ReserveForm /></PinGate>}
+        />
+        <Route
+          path="/kpi"
+          element={<PinGate><KpiDashboard /></PinGate>}
         />
       </Routes>
     </BrowserRouter>
