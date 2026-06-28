@@ -510,12 +510,18 @@ export default function Dashboard() {
       {/* Announcement Note */}
       {dashNote && (
         <div className="bg-gray-100 border-b border-gray-300 px-4 py-2.5">
-          <div className="max-w-7xl mx-auto flex items-start gap-3">
-            <span className="text-gray-500 text-sm mt-0.5 shrink-0">📢</span>
-            <p className="flex-1 text-gray-800 text-sm font-medium">{dashNote}</p>
+          <div className="max-w-7xl mx-auto flex items-center gap-2">
+            {/* Mobile: marquee scroll */}
+            <div className="flex-1 overflow-hidden md:hidden">
+              <span className="animate-marquee text-gray-800 text-sm font-medium">
+                {dashNote}
+              </span>
+            </div>
+            {/* Desktop: normal wrap */}
+            <p className="hidden md:block flex-1 text-gray-800 text-sm font-medium">{dashNote}</p>
             <button
               onClick={handleRemoveNote}
-              className="text-gray-400 hover:text-gray-700 text-sm shrink-0 ml-2"
+              className="text-gray-400 hover:text-gray-700 text-sm shrink-0"
               title="Remove note"
             >
               ✕
