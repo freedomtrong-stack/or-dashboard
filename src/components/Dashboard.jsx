@@ -209,6 +209,51 @@ function duration(from, to) {
   return `${mins}m`
 }
 
+function NoteModal({ initial, onSave, onClose }) {
+  const [text, setText] = useState(initial ?? '')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={onClose}>
+      <div className="bg-gray-900 rounded-2xl p-6 w-96 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-white font-bold text-sm">📢 Announcement Note</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-white text-xs">✕</button>
+        </div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="พิมพ์ข้อความประกาศ..."
+          rows={4}
+          className="w-full bg-gray-800 border border-gray-600 rounded-xl text-white text-sm px-4 py-3 placeholder-gray-500 resize-none focus:outline-none focus:border-blue-500"
+          autoFocus
+        />
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={() => onSave(text)}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+          >
+            Save
+          </button>
+          {initial && (
+            <button
+              onClick={() => onSave('')}
+              className="px-4 bg-red-900 hover:bg-red-800 text-red-300 text-sm font-semibold py-2.5 rounded-xl transition-colors"
+            >
+              Remove
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="px-4 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-semibold py-2.5 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const [active, setActive] = useState([])
   const [history, setHistory] = useState([])
@@ -219,6 +264,9 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [error, setError] = useState(null)
   const [now, setNow] = useState(new Date())
+  const [dashNote, setDashNote] = useState(null)
+  const [showNoteModal, setShowNoteModal] = useState(false)
+  const [showNotePinModal, setShowNotePinModal] = useState(false)
 
   useEffect(() => {
     const tick = setInterval(() => setNow(new Date()), 1000)
@@ -228,18 +276,18 @@ export default function Dashboard() {
   useEffect(() => {
     fetchActive()
     fetchHistory()
+    fetchNote()
 
     const channel = supabase
       .channel('or_cases_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'or_cases' },
-        () => {
-          fetchActive()
-          fetchHistory()
-          setLastUpdated(new Date())
-        },
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'or_cases' }, () => {
+        fetchActive()
+        fetchHistory()
+        setLastUpdated(new Date())
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_note' }, () => {
+        fetchNote()
+      })
       .subscribe()
 
     return () => supabase.removeChannel(channel)
@@ -282,6 +330,38 @@ export default function Dashboard() {
     await supabase.from('or_cases').update({ status }).eq('id', id)
   }
 
+  async function fetchNote() {
+    const { data } = await supabase.from('dashboard_note').select('text').eq('id', 1).single()
+    setDashNote(data?.text ?? null)
+  }
+
+  async function saveNote(text) {
+    if (!text.trim()) {
+      await supabase.from('dashboard_note').delete().eq('id', 1)
+      setDashNote(null)
+    } else {
+      await supabase.from('dashboard_note').upsert({ id: 1, text: text.trim(), updated_at: new Date().toISOString() })
+      setDashNote(text.trim())
+    }
+    setShowNoteModal(false)
+  }
+
+  function handleNoteButtonClick() {
+    if (sessionStorage.getItem(SESSION_KEY) === 'true') {
+      setShowNoteModal(true)
+    } else {
+      setShowNotePinModal(true)
+    }
+  }
+
+  function handleRemoveNote() {
+    if (sessionStorage.getItem(SESSION_KEY) === 'true') {
+      saveNote('')
+    } else {
+      setShowNotePinModal(true)
+    }
+  }
+
   const reserve = active.filter((c) => c.status === 'Reserve')
   const postponed = active.filter((c) => c.status === 'เลื่อน NPO')
   const sorted = active
@@ -295,6 +375,19 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
+      {showNotePinModal && (
+        <PinModal
+          onSuccess={() => { setShowNotePinModal(false); setShowNoteModal(true) }}
+          onClose={() => setShowNotePinModal(false)}
+        />
+      )}
+      {showNoteModal && (
+        <NoteModal
+          initial={dashNote}
+          onSave={saveNote}
+          onClose={() => setShowNoteModal(false)}
+        />
+      )}
       {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700 px-4 py-3">
         {/* Clock — desktop only */}
@@ -346,6 +439,12 @@ export default function Dashboard() {
             >
               + Add Case
             </Link>
+            <button
+              onClick={handleNoteButtonClick}
+              className="bg-gray-200 hover:bg-white text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            >
+              Note
+            </button>
           </div>
         </div>
       </header>
@@ -407,6 +506,23 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Announcement Note */}
+      {dashNote && (
+        <div className="bg-gray-100 border-b border-gray-300 px-4 py-2.5">
+          <div className="max-w-7xl mx-auto flex items-start gap-3">
+            <span className="text-gray-500 text-sm mt-0.5 shrink-0">📢</span>
+            <p className="flex-1 text-gray-800 text-sm font-medium">{dashNote}</p>
+            <button
+              onClick={handleRemoveNote}
+              className="text-gray-400 hover:text-gray-700 text-sm shrink-0 ml-2"
+              title="Remove note"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <main className="max-w-7xl mx-auto px-4 py-6">
