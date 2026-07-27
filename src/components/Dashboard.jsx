@@ -614,8 +614,8 @@ export default function Dashboard() {
                           <StatusDropdown caseId={c.id} currentStatus={c.status} onUpdate={quickStatus} />
                         </div>
                       </div>
-                      <p className="text-white font-semibold text-base leading-tight">{c.dx ?? <span className="text-gray-500 italic">Diagnosis TBD</span>}</p>
-                      <p className="text-gray-400 text-sm mt-0.5">{c.operation ?? <span className="italic">—</span>}</p>
+                      <p className="text-gray-400 text-xs leading-tight">{c.dx ?? <span className="italic">—</span>}</p>
+                      <p className="text-white font-semibold text-base mt-0.5">{c.operation ?? <span className="text-gray-500 italic">Operation TBD</span>}</p>
                       {c.note && <p className="text-purple-300 text-xs mt-1 italic">"{c.note}"</p>}
                     </div>
                   ))}
