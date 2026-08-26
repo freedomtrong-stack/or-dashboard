@@ -178,156 +178,6 @@ function overallCompliance(cases) {
   return total === 0 ? null : { pct: (met / total) * 100, met, total }
 }
 
-// ── Idle-gap analysis ─────────────────────────────────────────────────────────
-// An "idle gap" = a stretch where NO case was in the OR, yet at least one case
-// had already been received and was still waiting for its turn.
-const GAP_MIN_MS = 120 * 60 * 1000 // 2 hours
-
-function computeIdleGaps(cases) {
-  const t = (s) => new Date(s).getTime()
-
-  // busy intervals, merged so overlapping/parallel cases count as one block
-  const intervals = cases
-    .filter((c) => c.on_case_at && c.done_at && t(c.done_at) > t(c.on_case_at))
-    .map((c) => [t(c.on_case_at), t(c.done_at)])
-    .sort((a, b) => a[0] - b[0])
-
-  const busy = []
-  for (const [s, e] of intervals) {
-    const last = busy[busy.length - 1]
-    if (last && s <= last[1]) last[1] = Math.max(last[1], e)
-    else busy.push([s, e])
-  }
-
-  const gaps = []
-  for (let i = 0; i < busy.length - 1; i++) {
-    const start = busy[i][1]
-    const end = busy[i + 1][0]
-    if (end - start < GAP_MIN_MS) continue
-    // cases already received before the gap that only started after it ended
-    const waiting = cases.filter(
-      (c) => c.on_case_at && t(c.created_at) <= start && t(c.on_case_at) >= end,
-    )
-    if (waiting.length === 0) continue
-    gaps.push({
-      start,
-      end,
-      mins: Math.round((end - start) / 60000),
-      waiting: waiting
-        .map((c) => ({ ...c, wait: waitMinutes(c) }))
-        .sort((a, b) => (b.wait ?? 0) - (a.wait ?? 0)),
-    })
-  }
-  return gaps
-}
-
-// minutes of idle-with-backlog falling in each hour of the day (local time)
-function gapHourHistogram(gaps) {
-  const hours = new Array(24).fill(0)
-  const STEP = 15 * 60000
-  for (const g of gaps) {
-    for (let ts = g.start; ts < g.end; ts += STEP) {
-      hours[new Date(ts).getHours()] += 15
-    }
-  }
-  return hours
-}
-
-function fmtGapRange(start, end) {
-  const s = new Date(start)
-  const e = new Date(end)
-  const hm = (d) =>
-    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-  const day = (d) => d.toLocaleDateString([], { day: 'numeric', month: 'short' })
-  const sameDay =
-    s.getFullYear() === e.getFullYear() &&
-    s.getMonth() === e.getMonth() &&
-    s.getDate() === e.getDate()
-  return sameDay
-    ? `${day(s)}  ${hm(s)} – ${hm(e)}`
-    : `${day(s)} ${hm(s)} – ${day(e)} ${hm(e)}`
-}
-
-function GapHourChart({ hours }) {
-  const max = Math.max(1, ...hours)
-  return (
-    <div className="overflow-x-auto">
-      <div className="flex items-end gap-[3px] h-40 min-w-[560px]">
-        {hours.map((mins, h) => {
-          const hrs = mins / 60
-          const pct = (mins / max) * 100
-          // 05:00–08:00 and 17:00–20:00 are the shift-change windows worth flagging
-          const peak = pct >= 60
-          return (
-            <div key={h} className="flex-1 flex flex-col items-center justify-end h-full group">
-              <span className="text-[9px] text-gray-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                {hrs.toFixed(1)}h
-              </span>
-              <div
-                className={`w-full rounded-t transition-colors ${
-                  peak ? 'bg-red-500 group-hover:bg-red-400' : 'bg-gray-600 group-hover:bg-gray-500'
-                }`}
-                style={{ height: `${Math.max(pct, 1.5)}%` }}
-              />
-              <span className="text-[9px] text-gray-500 mt-1 font-mono">
-                {String(h).padStart(2, '0')}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function GapCasesModal({ gap, onClose }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div
-        className="bg-gray-900 rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl border border-gray-700"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
-          <div>
-            <h2 className="text-white font-bold">OR idle {fmtMins(gap.mins)}</h2>
-            <p className="text-gray-400 text-xs mt-0.5">
-              {fmtGapRange(gap.start, gap.end)} · {gap.waiting.length} case
-              {gap.waiting.length !== 1 ? 's' : ''} waiting throughout
-            </p>
-          </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white">✕</button>
-        </div>
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-gray-800">
-              <tr className="text-gray-400 text-xs uppercase tracking-wider">
-                <th className="px-4 py-2.5 text-left">HN</th>
-                <th className="px-4 py-2.5 text-left">Condition</th>
-                <th className="px-4 py-2.5 text-left">Diagnosis</th>
-                <th className="px-4 py-2.5 text-left">Operation</th>
-                <th className="px-4 py-2.5 text-right">Total wait</th>
-              </tr>
-            </thead>
-            <tbody>
-              {gap.waiting.map((c) => (
-                <tr key={c.id} className="border-b border-gray-800">
-                  <td className="px-4 py-2.5 font-mono text-blue-300 text-xs">{c.hn ?? '—'}</td>
-                  <td className="px-4 py-2.5 text-gray-300 text-xs">{c.condition}</td>
-                  <td className="px-4 py-2.5 text-white">{c.dx ?? '—'}</td>
-                  <td className="px-4 py-2.5 text-gray-400 text-xs">{c.operation ?? '—'}</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-yellow-400 text-xs">
-                    {c.wait == null ? '—' : fmtMins(c.wait)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Sub-components ────────────────────────────────────────────────────────────
 function KpiCard({ cat, stat, onClick }) {
   return (
@@ -787,7 +637,6 @@ export default function KpiDashboard() {
   const [anchor, setAnchor] = useState(new Date())
   const [selectedCat, setSelectedCat] = useState(null)
   const [showTimeline, setShowTimeline] = useState(false)
-  const [selectedGap, setSelectedGap] = useState(null)
 
   useEffect(() => {
     async function fetchAll() {
@@ -851,16 +700,6 @@ export default function KpiDashboard() {
   }, [periodCases])
 
   const excludedCount = periodCases.filter((c) => waitMinutes(c) == null).length
-
-  // idle gaps computed over the whole dataset, then narrowed to the period
-  const gaps = useMemo(() => computeIdleGaps(cases), [cases])
-  const periodGaps = useMemo(
-    () => gaps.filter((g) => inPeriod(new Date(g.start), granularity, anchor)),
-    [gaps, granularity, anchor],
-  )
-  const gapHours = useMemo(() => gapHourHistogram(periodGaps), [periodGaps])
-  const gapTotalMins = periodGaps.reduce((s, g) => s + g.mins, 0)
-  const gapWorstHour = gapHours.indexOf(Math.max(...gapHours))
 
   // rows for the drill-down modal (sorted slowest-first)
   const modalRows = useMemo(() => {
@@ -1005,81 +844,6 @@ export default function KpiDashboard() {
               )}
             </section>
 
-            {/* Idle gaps with backlog */}
-            <section className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-8">
-              <h2 className="text-sm font-bold text-gray-200 uppercase tracking-widest mb-1">
-                Idle OR with cases waiting
-              </h2>
-              <p className="text-gray-500 text-xs mb-5">
-                Stretches of ≥ 2 h with no case in the OR, while at least one already-received
-                case was still waiting its turn
-              </p>
-
-              {periodGaps.length === 0 ? (
-                <p className="text-gray-600 text-sm">No idle gaps with waiting cases in this period</p>
-              ) : (
-                <>
-                  <div className="grid grid-cols-3 gap-4 mb-6">
-                    <div className="bg-gray-900 rounded-xl px-4 py-3">
-                      <p className="text-gray-500 text-xs">Gaps found</p>
-                      <p className="text-2xl font-bold text-white mt-0.5">{periodGaps.length}</p>
-                    </div>
-                    <div className="bg-gray-900 rounded-xl px-4 py-3">
-                      <p className="text-gray-500 text-xs">Total idle time</p>
-                      <p className="text-2xl font-bold text-red-400 mt-0.5">
-                        {(gapTotalMins / 60).toFixed(0)}
-                        <span className="text-sm font-semibold text-gray-500 ml-1">h</span>
-                      </p>
-                    </div>
-                    <div className="bg-gray-900 rounded-xl px-4 py-3">
-                      <p className="text-gray-500 text-xs">Peak hour</p>
-                      <p className="text-2xl font-bold text-yellow-400 mt-0.5 font-mono">
-                        {String(gapWorstHour).padStart(2, '0')}:00
-                      </p>
-                    </div>
-                  </div>
-
-                  <h3 className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">
-                    When does it happen? · idle hours by time of day
-                  </h3>
-                  <GapHourChart hours={gapHours} />
-
-                  <h3 className="text-gray-400 text-xs font-semibold uppercase tracking-wider mt-7 mb-3">
-                    Longest gaps · click a row for the waiting cases
-                  </h3>
-                  <div className="space-y-1.5 max-h-96 overflow-y-auto">
-                    {[...periodGaps]
-                      .sort((a, b) => b.mins - a.mins)
-                      .map((g) => (
-                        <button
-                          key={g.start}
-                          onClick={() => setSelectedGap(g)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gray-900 hover:bg-gray-700 transition-colors text-left"
-                        >
-                          <span className="text-gray-300 text-xs font-mono w-44 shrink-0">
-                            {fmtGapRange(g.start, g.end)}
-                          </span>
-                          <span className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
-                            <span
-                              className="block h-2 bg-red-500 rounded-full"
-                              style={{
-                                width: `${Math.min(100, (g.mins / (12 * 60)) * 100)}%`,
-                              }}
-                            />
-                          </span>
-                          <span className="text-red-400 font-semibold text-xs w-16 text-right shrink-0">
-                            {fmtMins(g.mins)}
-                          </span>
-                          <span className="text-gray-400 text-xs w-20 text-right shrink-0">
-                            {g.waiting.length} waiting
-                          </span>
-                        </button>
-                      ))}
-                  </div>
-                </>
-              )}
-            </section>
-
             {/* Department breakdown */}
             <section className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-8">
               <h2 className="text-sm font-bold text-gray-200 uppercase tracking-widest mb-4">
@@ -1120,10 +884,6 @@ export default function KpiDashboard() {
           rows={modalRows}
           onClose={() => setSelectedCat(null)}
         />
-      )}
-
-      {selectedGap && (
-        <GapCasesModal gap={selectedGap} onClose={() => setSelectedGap(null)} />
       )}
 
       {showTimeline && (

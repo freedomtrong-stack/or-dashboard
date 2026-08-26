@@ -3,6 +3,7 @@ import Dashboard from './components/Dashboard'
 import UpdaterForm from './components/UpdaterForm'
 import ReserveForm from './components/ReserveForm'
 import KpiDashboard from './components/KpiDashboard'
+import IdleGapDashboard from './components/IdleGapDashboard'
 import PinGate from './components/PinGate'
 
 export default function App() {
@@ -26,6 +27,10 @@ export default function App() {
         <Route
           path="/kpi"
           element={<PinGate><KpiDashboard /></PinGate>}
+        />
+        <Route
+          path="/idle"
+          element={<PinGate><IdleGapDashboard /></PinGate>}
         />
       </Routes>
     </BrowserRouter>
