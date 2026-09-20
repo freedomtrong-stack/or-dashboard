@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import { logInactiveTransition } from '../lib/inactiveLog'
 
 const CONDITION_ROW = {
   Immediate:    'bg-red-950/60 hover:bg-red-950/80',
   Critical:    'bg-orange-950/60 hover:bg-orange-950/80',
   Urgency:      'bg-yellow-950/50 hover:bg-yellow-950/70',
   'Expedited':'bg-blue-950/40 hover:bg-blue-950/60',
+  'Non-critical':'bg-gray-800/60 hover:bg-gray-800/80',
 }
 
 const CONDITION_BADGE = {
@@ -14,6 +16,7 @@ const CONDITION_BADGE = {
   Critical:    'bg-orange-500 text-white',
   Urgency:      'bg-yellow-400 text-gray-900',
   'Expedited':'bg-blue-500 text-white',
+  'Non-critical':'bg-gray-500 text-white',
 }
 
 const STATUS_BADGE = {
@@ -21,20 +24,20 @@ const STATUS_BADGE = {
   Waiting:      'bg-gray-600 text-gray-100',
   Next:         'bg-yellow-400 text-gray-900',
   'On case':    'bg-green-500 text-white',
-  'เลื่อน NPO': 'bg-gray-500 text-white',
+  'In-active': 'bg-gray-500 text-white',
   Done:         'bg-gray-500 text-white',
   Cancelled:    'bg-red-900 text-red-300',
 }
 
-const CONDITION_ORDER = { Immediate: 0, Critical: 1, Urgency: 2, 'Expedited': 3 }
+const CONDITION_ORDER = { Immediate: 0, Critical: 1, Urgency: 2, 'Expedited': 3, 'Non-critical': 4 }
 const STATUS_ORDER = { 'On case': 0, Next: 1, Waiting: 2 }
 
 const NEXT_STATUSES = {
   Reserve:      ['Waiting', 'Cancelled'],
-  Waiting:      ['Next', 'On case', 'เลื่อน NPO', 'Cancelled'],
+  Waiting:      ['Next', 'On case', 'In-active', 'Cancelled'],
   Next:         ['On case', 'Waiting', 'Cancelled'],
   'On case':    ['Done', 'Cancelled'],
-  'เลื่อน NPO': ['Waiting', 'Cancelled'],
+  'In-active': ['Waiting', 'Cancelled'],
   Done:         ['On case', 'Waiting'],
   Cancelled:    ['Waiting'],
 }
@@ -43,7 +46,7 @@ const DROPDOWN_BTN = {
   Waiting:      'hover:bg-gray-700 text-gray-200',
   Next:         'hover:bg-yellow-900 text-yellow-300',
   'On case':    'hover:bg-green-900 text-green-300',
-  'เลื่อน NPO': 'hover:bg-gray-700 text-gray-300',
+  'In-active': 'hover:bg-gray-700 text-gray-300',
   Done:         'hover:bg-blue-900 text-blue-300',
   Cancelled:    'hover:bg-red-900 text-red-400',
 }
@@ -166,7 +169,7 @@ function StatusDropdown({ caseId, currentStatus, onUpdate }) {
                   onClick={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
-                    onUpdate(caseId, s)
+                    onUpdate(caseId, s, currentStatus)
                     setOpen(false)
                   }}
                   className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${DROPDOWN_BTN[s] ?? 'hover:bg-gray-700 text-white'}`}
@@ -326,8 +329,10 @@ export default function Dashboard() {
     if (data) setHistory(data)
   }
 
-  async function quickStatus(id, status) {
-    await supabase.from('or_cases').update({ status }).eq('id', id)
+  async function quickStatus(id, status, oldStatus) {
+    const { error } = await supabase.from('or_cases').update({ status }).eq('id', id)
+    if (error) { setError('Failed to update status.'); return }
+    await logInactiveTransition(id, oldStatus, status)
   }
 
   async function fetchNote() {
@@ -363,9 +368,9 @@ export default function Dashboard() {
   }
 
   const reserve = active.filter((c) => c.status === 'Reserve')
-  const postponed = active.filter((c) => c.status === 'เลื่อน NPO')
+  const postponed = active.filter((c) => c.status === 'In-active')
   const sorted = active
-    .filter((c) => c.status !== 'Reserve' && c.status !== 'เลื่อน NPO')
+    .filter((c) => c.status !== 'Reserve' && c.status !== 'In-active')
     .filter((c) => !filter || c.condition === filter)
     .sort((a, b) => {
       const statusDiff = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)
@@ -671,13 +676,13 @@ export default function Dashboard() {
               {sorted.length} active case{sorted.length !== 1 ? 's' : ''} · Done & Cancelled cases are hidden
             </p>
 
-            {/* เลื่อน NPO section */}
+            {/* In-active section */}
             {postponed.length > 0 && (
               <div className="mt-8">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="w-2 h-2 bg-gray-400 rounded-full" />
                   <h2 className="text-gray-400 text-sm font-bold uppercase tracking-widest">
-                    เลื่อน NPO ({postponed.length})
+                    In-active ({postponed.length})
                   </h2>
                 </div>
                 <div className="space-y-2 md:hidden">
@@ -723,7 +728,7 @@ export default function Dashboard() {
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="bg-gray-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">เลื่อน NPO</span>
+                            <span className="bg-gray-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">In-active</span>
                           </td>
                         </tr>
                       ))}

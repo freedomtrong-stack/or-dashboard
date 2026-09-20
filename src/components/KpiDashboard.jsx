@@ -286,12 +286,14 @@ const CONDITION_COLOR = {
   Critical:     'bg-orange-500',
   Urgency:      'bg-yellow-400',
   Expedited:    'bg-blue-500',
+  'Non-critical': 'bg-gray-500',
 }
 const CONDITION_TEXT = {
   Immediate:    'text-red-400',
   Critical:     'text-orange-400',
   Urgency:      'text-yellow-400',
   Expedited:    'text-blue-400',
+  'Non-critical': 'text-gray-400',
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -415,6 +417,7 @@ function MonthlyTimelineModal({ allCases, onClose }) {
     Critical:  'bg-orange-500',
     Urgency:   'bg-yellow-400',
     Expedited: 'bg-blue-500',
+    'Non-critical': 'bg-gray-500',
   }
 
   return (
@@ -543,7 +546,7 @@ function MonthlyTimelineModal({ allCases, onClose }) {
 
         {/* ── Legend ── */}
         <div className="flex items-center gap-4 px-5 py-2.5 bg-gray-800 border-t border-gray-700 shrink-0 flex-wrap text-[11px] text-gray-500">
-          {Object.entries({ Immediate:'bg-red-600', Critical:'bg-orange-500', Urgency:'bg-yellow-400', Expedited:'bg-blue-500' }).map(([k,c]) => (
+          {Object.entries({ Immediate:'bg-red-600', Critical:'bg-orange-500', Urgency:'bg-yellow-400', Expedited:'bg-blue-500', 'Non-critical':'bg-gray-500' }).map(([k,c]) => (
             <span key={k} className="flex items-center gap-1.5"><span className={`w-5 h-2.5 ${c} rounded-sm inline-block`}/>{k}</span>
           ))}
           <span className="ml-auto">คลิกวันที่ในหัวตารางเพื่อดูรายการเคส</span>

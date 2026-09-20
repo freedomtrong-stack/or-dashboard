@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import { logInactiveTransition } from '../lib/inactiveLog'
 
-const CONDITIONS = ['Immediate', 'Critical', 'Urgency', 'Expedited']
-const STATUSES = ['Reserve', 'Waiting', 'Next', 'On case', 'เลื่อน NPO', 'Done']
+const CONDITIONS = ['Immediate', 'Critical', 'Urgency', 'Expedited', 'Non-critical']
+const STATUSES = ['Reserve', 'Waiting', 'Next', 'On case', 'In-active', 'Done']
 const DEPARTMENTS = ['Surgery', 'Orthopedic', 'Eye', 'ENT', 'OBGYN', 'Med']
 const SURGERY_SUBTYPES = ['UGI', 'Colo', 'HPB', 'BE', 'Vas', 'Ped', 'CVT', 'Neuro', 'Plastic', 'Trauma', 'Uro', 'Transplant']
 
@@ -14,6 +15,7 @@ const CONDITION_SELECTED = {
   Critical:    'border-orange-500 bg-orange-50 text-orange-700',
   Urgency:      'border-yellow-400 bg-yellow-50 text-yellow-700',
   'Expedited':'border-blue-500 bg-blue-50 text-blue-700',
+  'Non-critical':'border-gray-400 bg-gray-100 text-gray-700',
 }
 
 const STATUS_SELECTED = {
@@ -21,7 +23,7 @@ const STATUS_SELECTED = {
   Waiting:      'border-gray-500 bg-gray-100 text-gray-800',
   Next:         'border-yellow-400 bg-yellow-50 text-yellow-700',
   'On case':    'border-blue-500 bg-blue-50 text-blue-700',
-  'เลื่อน NPO': 'border-gray-400 bg-gray-100 text-gray-700',
+  'In-active': 'border-gray-400 bg-gray-100 text-gray-700',
   Done:         'border-green-500 bg-green-50 text-green-700',
 }
 
@@ -46,6 +48,7 @@ export default function UpdaterForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
+  const [originalStatus, setOriginalStatus] = useState(null)
 
   const isReserve = form.status === 'Reserve'
 
@@ -71,6 +74,7 @@ export default function UpdaterForm() {
           department: data.department ?? null,
           subtype: data.subtype ?? null,
         })
+        setOriginalStatus(data.status)
       }
       setFetching(false)
     }
@@ -97,17 +101,26 @@ export default function UpdaterForm() {
       subtype: form.department === 'Surgery' ? form.subtype : null,
     }
 
-    const { error } = isEditing
-      ? await supabase.from('or_cases').update(payload).eq('id', id)
-      : await supabase.from('or_cases').insert(payload)
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
+    if (isEditing) {
+      const { error } = await supabase.from('or_cases').update(payload).eq('id', id)
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+        return
+      }
+      await logInactiveTransition(id, originalStatus, form.status, form.note.trim())
     } else {
-      setSuccess(true)
-      setTimeout(() => navigate('/dashboard'), 1200)
+      const { data, error } = await supabase.from('or_cases').insert(payload).select().single()
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+        return
+      }
+      await logInactiveTransition(data.id, null, form.status, form.note.trim())
     }
+
+    setSuccess(true)
+    setTimeout(() => navigate('/dashboard'), 1200)
   }
 
   async function handleCancel() {
@@ -121,6 +134,7 @@ export default function UpdaterForm() {
       setError(error.message)
       setLoading(false)
     } else {
+      await logInactiveTransition(id, originalStatus, CANCEL_STATUS)
       navigate('/dashboard')
     }
   }
@@ -196,8 +210,8 @@ export default function UpdaterForm() {
         {/* Note */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            {form.status === 'เลื่อน NPO'
-              ? <span className="text-amber-600">Note <span className="font-normal text-xs">(e.g. เลื่อน NPO to AMN)</span></span>
+            {form.status === 'In-active'
+              ? <span className="text-amber-600">Note <span className="font-normal text-xs">(e.g. NPO to AMN)</span></span>
               : form.status === 'Reserve'
               ? <span>Report <span className="text-purple-600 font-normal text-xs">(e.g. Vascular injury, จอมทอง)</span></span>
               : 'Note'}
@@ -206,13 +220,13 @@ export default function UpdaterForm() {
             value={form.note}
             onChange={(e) => set('note')(e.target.value)}
             placeholder={
-              form.status === 'เลื่อน NPO' ? 'e.g. เลื่อน NPO to AMN' :
+              form.status === 'In-active' ? 'e.g. NPO to AMN' :
               isReserve ? 'e.g. Severe head injury, จอมทอง — ETA 20 min' :
               'Optional note'
             }
             rows={2}
             className={`w-full px-4 py-3.5 text-base font-semibold border-2 rounded-xl focus:outline-none bg-white transition-colors resize-none ${
-              form.status === 'เลื่อน NPO' ? 'border-gray-400 focus:border-gray-500' :
+              form.status === 'In-active' ? 'border-gray-400 focus:border-gray-500' :
               isReserve ? 'border-purple-400 focus:border-purple-500' :
               'border-gray-300 focus:border-blue-500'
             }`}
@@ -338,7 +352,7 @@ export default function UpdaterForm() {
               </button>
             ))}
           </div>
-          {form.status === 'เลื่อน NPO' && (
+          {form.status === 'In-active' && (
             <p className="text-gray-500 text-xs mt-2">
               Case remains active — change back to Waiting when NPO time is ready.
             </p>
