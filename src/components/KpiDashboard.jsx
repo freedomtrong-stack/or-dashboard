@@ -311,6 +311,8 @@ function KpiCard({ cat, stat, onClick }) {
 }
 
 function CaseListModal({ cat, rows, onClose }) {
+  const missed = rows.filter((r) => !r.met).length
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4" onClick={onClose}>
       <div
@@ -323,9 +325,20 @@ function CaseListModal({ cat, rows, onClose }) {
             <h2 className="text-white font-bold">{cat.label}</h2>
             <p className="text-gray-400 text-xs">
               {rows.length} cases · target ≤ {fmtMins(cat.target)}
+              {missed > 0 && <> · <span className="text-red-400">{missed} เกินเป้า</span></>}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl px-2">✕</button>
+          <div className="flex items-center gap-3">
+            {missed > 0 && (
+              <Link
+                to="/backfill"
+                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap"
+              >
+                กรอกเหตุผลที่ Backfill →
+              </Link>
+            )}
+            <button onClick={onClose} className="text-gray-400 hover:text-white text-xl px-2">✕</button>
+          </div>
         </div>
         {/* list */}
         <div className="overflow-y-auto">
@@ -339,6 +352,7 @@ function CaseListModal({ cat, rows, onClose }) {
                   <th className="px-4 py-2.5 text-left">Diagnosis</th>
                   <th className="px-4 py-2.5 text-left">Operation</th>
                   <th className="px-4 py-2.5 text-right">Wait</th>
+                  <th className="px-4 py-2.5 text-right w-24"></th>
                 </tr>
               </thead>
               <tbody>
@@ -349,6 +363,16 @@ function CaseListModal({ cat, rows, onClose }) {
                     <td className="px-4 py-2.5 text-gray-400">{r.operation ?? '—'}</td>
                     <td className={`px-4 py-2.5 text-right font-mono font-semibold whitespace-nowrap ${r.met ? 'text-green-400' : 'text-red-400'}`}>
                       {fmtMins(r.wait)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      {!r.met && (
+                        <Link
+                          to={`/backfill?case=${r.id}`}
+                          className="text-amber-400 hover:text-amber-300 text-xs font-semibold whitespace-nowrap underline underline-offset-2"
+                        >
+                          กรอกเหตุผล
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 ))}

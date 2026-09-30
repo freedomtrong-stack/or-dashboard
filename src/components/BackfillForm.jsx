@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import AnalyticsNav from './AnalyticsNav'
 import {
@@ -128,6 +128,9 @@ export default function BackfillForm() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [range, setRange] = useState('last7')
+  const [params, setParams] = useSearchParams()
+  // Arriving from a KPI drill-down: show just that case, already open.
+  const focusId = params.get('case')
   const [openId, setOpenId] = useState(null)
   const [onlyMissing, setOnlyMissing] = useState(true)
   const [saved, setSaved] = useState({})
@@ -161,6 +164,10 @@ export default function BackfillForm() {
     fetchAll()
   }, [])
 
+  useEffect(() => {
+    if (focusId) setOpenId(focusId)
+  }, [focusId])
+
   // merge in-place so a saved row updates without refetching everything
   const merged = useMemo(
     () => cases.map((c) => (saved[c.id] ? { ...c, ...saved[c.id] } : c)),
@@ -168,12 +175,13 @@ export default function BackfillForm() {
   )
 
   const rows = useMemo(() => {
+    if (focusId) return merged.filter((c) => c.id === focusId)
     return merged
       .filter((c) => inRange(c.created_at, range))
       .filter(isDelayed)
       .filter((c) => !onlyMissing || needsReason(c))
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-  }, [merged, range, onlyMissing])
+  }, [merged, range, onlyMissing, focusId])
 
   const periodDelayed = merged.filter((c) => inRange(c.created_at, range)).filter(isDelayed)
   const documented = periodDelayed.filter((c) => c.delay_reason).length
@@ -242,6 +250,18 @@ export default function BackfillForm() {
                 )}
               </div>
             </div>
+
+            {focusId && (
+              <div className="bg-blue-950/40 border border-blue-800/60 text-blue-200 px-4 py-3 rounded-xl mb-4 text-sm flex items-center justify-between gap-4 flex-wrap">
+                <span>กำลังดูเคสเดียวที่เลือกมาจากหน้า KPI</span>
+                <button
+                  onClick={() => { setParams({}); setOpenId(null) }}
+                  className="bg-blue-700 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap"
+                >
+                  ดูเคสทั้งหมด
+                </button>
+              </div>
+            )}
 
             {rows.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-gray-500">
