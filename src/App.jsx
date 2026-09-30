@@ -4,6 +4,9 @@ import UpdaterForm from './components/UpdaterForm'
 import ReserveForm from './components/ReserveForm'
 import KpiDashboard from './components/KpiDashboard'
 import IdleGapDashboard from './components/IdleGapDashboard'
+import DeptDashboard from './components/DeptDashboard'
+import OrReport from './components/OrReport'
+import BackfillForm from './components/BackfillForm'
 import PinGate from './components/PinGate'
 
 export default function App() {
@@ -27,6 +30,18 @@ export default function App() {
         <Route
           path="/kpi"
           element={<PinGate><KpiDashboard /></PinGate>}
+        />
+        <Route
+          path="/dept"
+          element={<PinGate><DeptDashboard /></PinGate>}
+        />
+        <Route
+          path="/report"
+          element={<PinGate><OrReport /></PinGate>}
+        />
+        <Route
+          path="/backfill"
+          element={<PinGate><BackfillForm /></PinGate>}
         />
         <Route
           path="/idle"

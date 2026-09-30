@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import AnalyticsNav from './AnalyticsNav'
 
 // ── Severe head detection (edit this list anytime) ───────────────────────────
 const SEVERE_HEAD_KEYWORDS = [
@@ -160,22 +162,114 @@ function buildBuckets(granularity, anchor, cases) {
   return buckets
 }
 
+// Target a case is judged against — severe head wins when it matches
+function targetFor(c) {
+  for (const cat of KPI_CATEGORIES) {
+    if (cat.match(c)) return cat
+  }
+  return null
+}
+
 // Overall compliance across all KPI categories for a set of cases
 function overallCompliance(cases) {
   let met = 0, total = 0
   for (const c of cases) {
     const w = waitMinutes(c)
     if (w == null) continue
-    // assign target by first matching category (severe head wins if matched)
-    let target = null
-    for (const cat of KPI_CATEGORIES) {
-      if (cat.match(c)) { target = cat.target; break }
-    }
-    if (target == null) continue
+    const cat = targetFor(c)
+    if (cat == null) continue
     total++
-    if (w <= target) met++
+    if (w <= cat.target) met++
   }
   return total === 0 ? null : { pct: (met / total) * 100, met, total }
+}
+
+// Cases behind one trend bar, failures first so the misses are what you see
+function TrendCasesModal({ bucket, onClose }) {
+  const rows = bucket.cases
+    .map((c) => {
+      const cat = targetFor(c)
+      const wait = waitMinutes(c)
+      return { ...c, cat, wait, met: cat && wait != null && wait <= cat.target }
+    })
+    .sort((a, b) => {
+      const rank = (r) => (r.met ? 2 : r.cat ? 0 : 1)
+      if (rank(a) !== rank(b)) return rank(a) - rank(b)
+      return (b.wait ?? -1) - (a.wait ?? -1)
+    })
+
+  const comp = overallCompliance(bucket.cases)
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4" onClick={onClose}>
+      <div
+        className="bg-gray-900 w-full sm:max-w-4xl sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col border border-gray-700"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700 shrink-0">
+          <div>
+            <h3 className="text-white font-bold">{bucket.label}</h3>
+            <p className="text-gray-400 text-xs mt-0.5">
+              {comp
+                ? <>Compliance <span className={compColor(comp.pct)}>{Math.round(comp.pct)}%</span> · {comp.met}/{comp.total} met target</>
+                : `${bucket.cases.length} cases`}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl px-2">✕</button>
+        </div>
+        <div className="overflow-y-auto flex-1">
+          {rows.length === 0 ? (
+            <p className="text-gray-500 text-sm p-6 text-center">No cases</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-4 py-2.5 text-left w-8"></th>
+                  <th className="px-4 py-2.5 text-left">HN</th>
+                  <th className="px-4 py-2.5 text-left">Condition</th>
+                  <th className="px-4 py-2.5 text-left">Diagnosis</th>
+                  <th className="px-4 py-2.5 text-left">Operation</th>
+                  <th className="px-4 py-2.5 text-left">Dept</th>
+                  <th className="px-4 py-2.5 text-right">Wait</th>
+                  <th className="px-4 py-2.5 text-right">Target</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((c) => (
+                  <tr key={c.id} className="border-b border-gray-800 hover:bg-gray-800/50">
+                    <td className="px-4 py-2.5 text-center">
+                      {c.cat == null || c.wait == null ? <span className="text-gray-600" title="No target for this condition">–</span>
+                        : c.met ? <span className="text-green-400">✓</span>
+                        : <span className="text-red-400">✕</span>}
+                    </td>
+                    <td className="px-4 py-2.5 font-mono text-blue-300 text-xs whitespace-nowrap">{c.hn ?? '—'}</td>
+                    <td className="px-4 py-2.5 text-xs whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${CONDITION_COLOR[c.condition] ?? 'bg-gray-600'} text-white`}>
+                        {c.condition}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-white">{c.dx ?? '—'}</td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs">{c.operation ?? '—'}</td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+                      {c.department ?? '—'}{c.subtype ? ` · ${c.subtype}` : ''}
+                    </td>
+                    <td className={`px-4 py-2.5 text-right font-mono font-bold text-xs whitespace-nowrap ${
+                      c.cat == null || c.wait == null ? 'text-gray-400' : c.met ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {fmtMins(c.wait)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-gray-500 font-mono text-xs whitespace-nowrap">
+                      {c.cat ? `≤ ${fmtMins(c.cat.target)}` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -296,276 +390,16 @@ const CONDITION_TEXT = {
   'Non-critical': 'text-gray-400',
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000
-const HOUR_TICKS = Array.from({ length: 13 }, (_, i) => i * 2) // 0,2,4,...,24
-
-function timeFmt(ts, dayStart) {
-  if (!ts) return ''
-  const d = new Date(ts)
-  const h = d.getHours().toString().padStart(2, '0')
-  const m = d.getMinutes().toString().padStart(2, '0')
-  const label = `${h}:${m}`
-  const diff = Math.floor((new Date(ts).getTime() - dayStart) / DAY_MS)
-  return diff > 0 ? `${label}(+${diff})` : label
-}
 
 // ── Day case list (popup when clicking a day) ─────────────────────────────────
-function DayCasesModal({ dayLabel, cases, onClose }) {
-  const sorted = [...cases]
-    .filter((c) => c.on_case_at)
-    .sort((a, b) => new Date(a.on_case_at) - new Date(b.on_case_at))
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-gray-900 w-full sm:max-w-3xl sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700 shrink-0">
-          <div>
-            <h3 className="text-white font-bold">{dayLabel}</h3>
-            <p className="text-gray-400 text-xs">{sorted.length} cases</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl px-2">✕</button>
-        </div>
-        <div className="overflow-y-auto flex-1">
-          {sorted.length === 0 ? (
-            <p className="text-gray-500 text-sm p-6 text-center">No cases with OR start time</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-gray-800 text-gray-400 text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-2.5 text-left">On case</th>
-                  <th className="px-4 py-2.5 text-left">HN</th>
-                  <th className="px-4 py-2.5 text-left">Diagnosis</th>
-                  <th className="px-4 py-2.5 text-left">Operation</th>
-                  <th className="px-4 py-2.5 text-right">Wait</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((c) => {
-                  const wm = waitMinutes(c)
-                  const target = c.condition === 'Immediate' ? 30 : c.condition === 'Critical' ? 60 : 360
-                  const passed = wm != null && wm <= target
-                  const dayStart = new Date(new Date(c.on_case_at).getFullYear(), new Date(c.on_case_at).getMonth(), new Date(c.on_case_at).getDate()).getTime()
-                  return (
-                    <tr key={c.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                      <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap font-mono">{timeFmt(c.on_case_at, dayStart)}</td>
-                      <td className="px-4 py-2.5 font-mono text-blue-300 text-xs whitespace-nowrap">{c.hn ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-white">{c.dx ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-gray-400 text-sm">{c.operation ?? '—'}</td>
-                      <td className={`px-4 py-2.5 text-right font-mono font-bold text-xs whitespace-nowrap ${passed ? 'text-green-400' : 'text-red-400'}`}>
-                        {fmtMins(wm)}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ── Monthly Gantt timeline (horizontal scroll) ───────────────────────────────
 const DOW   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const PX_PER_HOUR = 60          // 60px per hour → 1440px per day
 const LABEL_W     = 160         // px for left case-label column
 
-function MonthlyTimelineModal({ allCases, onClose }) {
-  const [monthAnchor, setMonthAnchor] = useState(new Date())
-  const [selectedDay, setSelectedDay] = useState(null)
 
-  const y = monthAnchor.getFullYear()
-  const m = monthAnchor.getMonth()
-  const daysInMonth  = new Date(y, m + 1, 0).getDate()
-  const monthStart   = new Date(y, m, 1).getTime()
-  const monthEnd     = new Date(y, m + 1, 1).getTime()
-  const totalHours   = daysInMonth * 24
-  const totalPx      = totalHours * PX_PER_HOUR
-
-  const monthLabel = monthAnchor.toLocaleDateString([], { month: 'long', year: 'numeric' })
-
-  // cases with on_case_at in this month, sorted by on_case_at
-  const cases = useMemo(() => allCases
-    .filter((c) => {
-      if (!c.on_case_at) return false
-      const t = new Date(c.on_case_at).getTime()
-      return t >= monthStart && t < monthEnd
-    })
-    .sort((a, b) => new Date(a.on_case_at) - new Date(b.on_case_at)),
-  [allCases, monthStart, monthEnd])
-
-  // px position from a timestamp
-  function toLeft(ts) {
-    if (!ts) return null
-    return ((new Date(ts).getTime() - monthStart) / (DAY_MS)) * PX_PER_HOUR * 24
-  }
-
-  // group cases by day for click targets
-  const casesByDay = useMemo(() => {
-    const map = {}
-    cases.forEach((c) => {
-      const d = new Date(c.on_case_at).getDate()
-      if (!map[d]) map[d] = []
-      map[d].push(c)
-    })
-    return map
-  }, [cases])
-
-  const COND_COLOR = {
-    Immediate: 'bg-red-600',
-    Critical:  'bg-orange-500',
-    Urgency:   'bg-yellow-400',
-    Expedited: 'bg-blue-500',
-    'Non-critical': 'bg-gray-500',
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-gray-900" onClick={onClose}>
-      <div className="flex flex-col h-full" onClick={e => e.stopPropagation()}>
-
-        {/* ── Top bar ── */}
-        <div className="flex items-center justify-between px-5 py-3 bg-gray-800 border-b border-gray-700 shrink-0 gap-3 flex-wrap">
-          <h2 className="text-white font-bold text-lg">Monthly Timeline</h2>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setMonthAnchor(new Date(y, m-1, 1))} className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 flex items-center justify-center">‹</button>
-            <span className="text-white font-semibold min-w-[150px] text-center text-sm">{monthLabel} · {cases.length} cases</span>
-            <button onClick={() => setMonthAnchor(new Date(y, m+1, 1))} className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 flex items-center justify-center">›</button>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl px-2">✕</button>
-        </div>
-
-        {/* ── Scrollable area (both x and y) ── */}
-        <div className="flex-1 overflow-auto">
-          <div style={{ minWidth: LABEL_W + totalPx + 32 }}>
-
-            {/* ── Day header row ── */}
-            <div className="flex sticky top-0 z-10 bg-gray-900 border-b border-gray-700">
-              <div style={{ width: LABEL_W, minWidth: LABEL_W }} className="shrink-0 border-r border-gray-700 bg-gray-800" />
-              <div className="relative bg-gray-800" style={{ width: totalPx }}>
-                {Array.from({ length: daysInMonth }, (_, i) => {
-                  const day  = i + 1
-                  const dow  = new Date(y, m, day).getDay()
-                  const isWE = dow === 0 || dow === 6
-                  const left = i * 24 * PX_PER_HOUR
-                  return (
-                    <div
-                      key={day}
-                      className={`absolute top-0 bottom-0 flex flex-col items-center justify-center border-r border-gray-700 ${isWE ? 'bg-gray-700/40' : ''}`}
-                      style={{ left, width: 24 * PX_PER_HOUR }}
-                    >
-                      <span className={`text-xs font-bold ${isWE ? 'text-blue-400' : 'text-gray-300'}`}>
-                        {day}
-                      </span>
-                      <span className="text-[10px] text-gray-500">{DOW[dow]}</span>
-                      {/* click to see day cases */}
-                      <button
-                        onClick={() => setSelectedDay({
-                          label: `${DOW[dow]} ${day} ${monthLabel}`,
-                          cases: casesByDay[day] ?? [],
-                        })}
-                        className="absolute inset-0 hover:bg-white/5 transition-colors"
-                      />
-                    </div>
-                  )
-                })}
-                {/* hour ticks every 6h */}
-                {Array.from({ length: daysInMonth * 4 }, (_, i) => (
-                  <div
-                    key={`h${i}`}
-                    className="absolute bottom-0 text-[9px] text-gray-700"
-                    style={{ left: i * 6 * PX_PER_HOUR + 2 }}
-                  >
-                    {`${((i * 6) % 24).toString().padStart(2,'0')}h`}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Case rows ── */}
-            {cases.length === 0 ? (
-              <p className="text-gray-600 text-sm p-8 text-center">No cases with OR start time this month</p>
-            ) : (
-              cases.map((c) => {
-                const left  = toLeft(c.on_case_at)
-                const doneL = toLeft(c.done_at)
-                const barW  = doneL != null && left != null
-                  ? Math.max(doneL - left, 8)
-                  : 8
-                const wm     = waitMinutes(c)
-                const target = c.condition === 'Immediate' ? 30 : c.condition === 'Critical' ? 60 : 360
-                const passed = wm != null && wm <= target
-                const color  = COND_COLOR[c.condition] ?? 'bg-gray-500'
-                const dayRef = new Date(c.on_case_at)
-                const ds     = new Date(dayRef.getFullYear(), dayRef.getMonth(), dayRef.getDate()).getTime()
-
-                return (
-                  <div
-                    key={c.id}
-                    className="flex border-b border-gray-800 hover:bg-gray-800/30 transition-colors"
-                    style={{ height: 40 }}
-                  >
-                    {/* case label */}
-                    <div
-                      className="shrink-0 flex items-center gap-2 px-3 border-r border-gray-800 bg-gray-900"
-                      style={{ width: LABEL_W, minWidth: LABEL_W }}
-                    >
-                      <span className="text-blue-300 font-mono text-[11px] whitespace-nowrap">{c.hn ?? '—'}</span>
-                      <span className="text-gray-500 text-[10px] truncate flex-1" title={c.dx}>{c.dx ?? '—'}</span>
-                      <span className={`text-[10px] font-mono font-bold whitespace-nowrap ${passed ? 'text-green-400' : 'text-red-400'}`}>
-                        {fmtMins(wm)}
-                      </span>
-                    </div>
-
-                    {/* timeline track */}
-                    <div className="relative flex-1" style={{ width: totalPx }}>
-                      {/* day dividers */}
-                      {Array.from({ length: daysInMonth }, (_, i) => (
-                        <div
-                          key={i}
-                          className={`absolute top-0 bottom-0 border-r ${i % 7 === 6 || i % 7 === 5 ? 'border-gray-700/50 bg-gray-800/20' : 'border-gray-800'}`}
-                          style={{ left: i * 24 * PX_PER_HOUR, width: 24 * PX_PER_HOUR }}
-                        />
-                      ))}
-
-                      {/* case bar */}
-                      {left != null && (
-                        <div
-                          className={`absolute top-2 bottom-2 ${color} rounded opacity-85`}
-                          style={{ left, width: barW }}
-                          title={`${timeFmt(c.on_case_at, ds)} → ${timeFmt(c.done_at, ds)}\n${c.dx}`}
-                        />
-                      )}
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-
-        {/* ── Legend ── */}
-        <div className="flex items-center gap-4 px-5 py-2.5 bg-gray-800 border-t border-gray-700 shrink-0 flex-wrap text-[11px] text-gray-500">
-          {Object.entries({ Immediate:'bg-red-600', Critical:'bg-orange-500', Urgency:'bg-yellow-400', Expedited:'bg-blue-500', 'Non-critical':'bg-gray-500' }).map(([k,c]) => (
-            <span key={k} className="flex items-center gap-1.5"><span className={`w-5 h-2.5 ${c} rounded-sm inline-block`}/>{k}</span>
-          ))}
-          <span className="ml-auto">คลิกวันที่ในหัวตารางเพื่อดูรายการเคส</span>
-        </div>
-      </div>
-
-      {/* day popup */}
-      {selectedDay && (
-        <DayCasesModal
-          dayLabel={selectedDay.label}
-          cases={selectedDay.cases}
-          onClose={() => setSelectedDay(null)}
-        />
-      )}
-    </div>
-  )
-}
-
-function TrendBars({ buckets, granularity, onDayClick, allCases }) {
+function TrendBars({ buckets, onDayClick }) {
   const active = buckets.filter((b) => b.cases.length > 0)
   if (active.length === 0) return <p className="text-gray-600 text-sm">No data in this period</p>
 
@@ -591,15 +425,7 @@ function TrendBars({ buckets, granularity, onDayClick, allCases }) {
             return (
               <button
                 key={i}
-                onClick={() => {
-                  // filter ALL cases by on_case_at falling in this bucket's date range
-                  const timelineCases = allCases.filter((c) => {
-                    if (!c.on_case_at) return false
-                    const t = new Date(c.on_case_at).getTime()
-                    return t >= b.dateFrom.getTime() && t < b.dateTo.getTime()
-                  })
-                  onDayClick({ ...b, cases: timelineCases })
-                }}
+                onClick={() => onDayClick(b)}
                 className="flex flex-col items-center group hover:opacity-80 transition-opacity"
                 style={{ minWidth: 48 }}
                 title={`คลิกดูรายการเคส ${b.label}`}
@@ -639,7 +465,7 @@ export default function KpiDashboard() {
   const [granularity, setGranularity] = useState('all')
   const [anchor, setAnchor] = useState(new Date())
   const [selectedCat, setSelectedCat] = useState(null)
-  const [showTimeline, setShowTimeline] = useState(false)
+  const [selectedBucket, setSelectedBucket] = useState(null)
 
   useEffect(() => {
     async function fetchAll() {
@@ -730,15 +556,7 @@ export default function KpiDashboard() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowTimeline(true)}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                Timeline
-              </button>
+              <AnalyticsNav />
               <div className="text-right">
                 <p className="text-gray-500 text-xs">Showing</p>
                 <p className="text-white font-semibold text-sm">
@@ -843,7 +661,7 @@ export default function KpiDashboard() {
               {buckets.length === 0 ? (
                 <p className="text-gray-600 text-sm">No data</p>
               ) : (
-                <TrendBars buckets={buckets} granularity={granularity} onDayClick={() => {}} allCases={cases} />
+                <TrendBars buckets={buckets} onDayClick={setSelectedBucket} />
               )}
             </section>
 
@@ -889,10 +707,10 @@ export default function KpiDashboard() {
         />
       )}
 
-      {showTimeline && (
-        <MonthlyTimelineModal
-          allCases={cases}
-          onClose={() => setShowTimeline(false)}
+      {selectedBucket && (
+        <TrendCasesModal
+          bucket={selectedBucket}
+          onClose={() => setSelectedBucket(null)}
         />
       )}
     </div>

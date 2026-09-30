@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import AnalyticsNav from './AnalyticsNav'
 
 // An "idle gap" = a stretch where NO case was in the OR, yet at least one case
 // had already been received and was still waiting for its turn.
@@ -259,12 +260,7 @@ export default function IdleGapDashboard() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Link
-                to="/kpi"
-                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-              >
-                KPI page
-              </Link>
+              <AnalyticsNav />
               <div className="text-right">
                 <p className="text-gray-500 text-xs">Showing</p>
                 <p className="text-white font-semibold text-sm">

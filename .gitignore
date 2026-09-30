@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# secrets — never commit real credentials
+.env
+.env.local
+.env.*.local
+
+# data exports may contain patient-identifiable information (HN, diagnosis)
+*.xlsx
+*.csv
+
+# OS / editor
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# local editor/tooling config
+.claude/
