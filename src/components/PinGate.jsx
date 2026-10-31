@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
-const CORRECT_PIN = import.meta.env.VITE_UPDATER_PIN ?? '1234'
+// No fallback on purpose: a build missing the env var unlocks for nobody,
+// rather than falling back to a PIN that is readable in this source file.
+const CORRECT_PIN = import.meta.env.VITE_UPDATER_PIN
 const SESSION_KEY = 'or_pin_unlocked'
 
 export default function PinGate({ children }) {

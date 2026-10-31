@@ -51,7 +51,7 @@ const DROPDOWN_BTN = {
   Cancelled:    'hover:bg-red-900 text-red-400',
 }
 
-const CORRECT_PIN = import.meta.env.VITE_UPDATER_PIN ?? '1234'
+const CORRECT_PIN = import.meta.env.VITE_UPDATER_PIN
 const SESSION_KEY = 'or_pin_unlocked'
 
 function PinModal({ onSuccess, onClose }) {
